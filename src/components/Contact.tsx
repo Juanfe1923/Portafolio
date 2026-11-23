@@ -18,9 +18,15 @@ import SectionHeading from "./SectionHeading";
 import TiltCard from "./TiltCard";
 import { soundManager } from "@/utils/audio";
 
+const FORM_ENDPOINT = `https://formsubmit.co/ajax/${profile.email}`;
+
+type SubmitStatus = "idle" | "success" | "error";
+
 export default function Contact() {
   const [copied, setCopied] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
+  const [errorMessage, setErrorMessage] = useState("");
   const [form, setForm] = useState({ name: "", email: "", message: "" });
   const [medellinTime, setMedellinTime] = useState("");
 
@@ -62,18 +68,63 @@ export default function Contact() {
     window.setTimeout(() => setCopied(false), 2400);
   };
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    soundManager.playSuccess();
+  const mailtoFallback = () => {
     const subject = encodeURIComponent(
       `Contacto portafolio — ${form.name || "Sin nombre"}`
     );
     const body = encodeURIComponent(
       `${form.message}\n\n— ${form.name}\n${form.email}`
     );
-    window.location.href = `mailto:${profile.email}?subject=${subject}&body=${body}`;
-    setSent(true);
-    window.setTimeout(() => setSent(false), 6000);
+    return `mailto:${profile.email}?subject=${subject}&body=${body}`;
+  };
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (isSending) return;
+
+    setIsSending(true);
+    setSubmitStatus("idle");
+    setErrorMessage("");
+
+    try {
+      const response = await fetch(FORM_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim(),
+          message: form.message.trim(),
+          _subject: `Contacto portafolio — ${form.name.trim() || "Sin nombre"}`,
+          _replyto: form.email.trim(),
+          _template: "table",
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as {
+        success?: boolean;
+        message?: string;
+      } | null;
+
+      if (!response.ok || data?.success === false) {
+        throw new Error(data?.message || `Error ${response.status}`);
+      }
+
+      setSubmitStatus("success");
+      setForm({ name: "", email: "", message: "" });
+      soundManager.playSuccess();
+    } catch (error) {
+      setSubmitStatus("error");
+      setErrorMessage(
+        error instanceof Error ? error.message : "Error inesperado"
+      );
+    } finally {
+      setIsSending(false);
+    }
+
+    window.setTimeout(() => setSubmitStatus("idle"), 7000);
   };
 
   const inputClasses =
@@ -202,6 +253,7 @@ export default function Contact() {
         <TiltCard maxTilt={5} glareColor="rgba(168, 85, 247, 0.12)">
           <motion.form
             onSubmit={handleSubmit}
+            aria-busy={isSending}
             initial={{ opacity: 0, y: 28 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-60px" }}
@@ -285,10 +337,11 @@ export default function Contact() {
             <div className="mt-6">
               <button
                 type="submit"
+                disabled={isSending}
                 onClick={() => soundManager.playClick()}
-                className="group relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-500 via-sky-400 to-violet-500 px-6 py-3.5 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/25 transition-all duration-300 hover:shadow-cyan-400/40 hover:brightness-110 sm:w-auto"
+                className="group relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-500 via-sky-400 to-violet-500 px-6 py-3.5 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/25 transition-all duration-300 hover:shadow-cyan-400/40 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
-                <span>Enviar Mensaje</span>
+                <span>{isSending ? "Enviando…" : "Enviar Mensaje"}</span>
                 <Send
                   size={15}
                   className="transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-0.5"
@@ -296,18 +349,43 @@ export default function Contact() {
                 <span className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
               </button>
 
-              <AnimatePresence>
-                {sent && (
-                  <motion.p
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="mt-3 text-xs font-semibold text-emerald-400 font-mono"
-                  >
-                    ¡Listo! Se abrió tu cliente de correo con el mensaje preparado.
-                  </motion.p>
-                )}
-              </AnimatePresence>
+              <div aria-live="polite">
+                <AnimatePresence>
+                  {submitStatus === "success" && (
+                    <motion.p
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="mt-3 text-xs font-semibold text-emerald-400 font-mono"
+                    >
+                      ¡Mensaje enviado! Te responderé tan pronto como lo lea.
+                    </motion.p>
+                  )}
+
+                  {submitStatus === "error" && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="mt-3 text-xs font-mono text-rose-400"
+                    >
+                      <p className="font-semibold">
+                        No se pudo enviar el mensaje
+                        {errorMessage ? `: ${errorMessage}` : "."}
+                      </p>
+                      <p className="mt-1 text-slate-400">
+                        También puedes escribirme directamente a{" "}
+                        <a
+                          href={mailtoFallback()}
+                          className="text-cyan-300 underline hover:text-cyan-200"
+                        >
+                          {profile.email}
+                        </a>
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </motion.form>
         </TiltCard>
@@ -328,7 +406,7 @@ export default function Contact() {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/40 pt-4 font-mono text-[11px] text-slate-500">
-          <p>Next.js 16 · React 19 · Three.js 3D · Tailwind CSS · Turbopack</p>
+          <p>React 19 · Vite · Three.js 3D · Tailwind CSS</p>
           <p className="text-cyan-400/80">Código Modular · Alto Rendimiento</p>
         </div>
       </footer>
