@@ -1,11 +1,20 @@
-"use client";
-
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { Sparkles, Orbit, RotateCw, Layers } from "lucide-react";
 import { soundManager } from "@/utils/audio";
 
 type ShapeType = "icosahedron" | "torusKnot" | "octahedron";
+
+function isWebGLAvailable() {
+  try {
+    const canvas = document.createElement("canvas");
+    return Boolean(
+      canvas.getContext("webgl2") || canvas.getContext("webgl")
+    );
+  } catch {
+    return false;
+  }
+}
 
 interface TechNodeDef {
   id: string;
@@ -333,6 +342,7 @@ export default function ThreeDScene() {
   const [shape, setShape] = useState<ShapeType>("icosahedron");
   const [wireframeOnly, setWireframeOnly] = useState(false);
   const [speed, setSpeed] = useState<1 | 2>(1);
+  const [webglFailed, setWebglFailed] = useState(false);
 
   // References to communicate with render loop
   const sceneStateRef = useRef<{
@@ -357,6 +367,11 @@ export default function ThreeDScene() {
     const container = containerRef.current;
     if (!container) return;
 
+    if (!isWebGLAvailable()) {
+      setWebglFailed(true);
+      return;
+    }
+
     // SCENE SETUP
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(
@@ -367,11 +382,18 @@ export default function ThreeDScene() {
     );
     camera.position.z = 9.4; // Camera distance gives comfortable perspective of all orbiting nodes
 
-    const renderer = new THREE.WebGLRenderer({
-      alpha: true,
-      antialias: true,
-      powerPreference: "high-performance",
-    });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: "high-performance",
+      });
+    } catch {
+      setWebglFailed(true);
+      return;
+    }
+    setWebglFailed(false);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(container.clientWidth, container.clientHeight);
     container.appendChild(renderer.domElement);
@@ -751,7 +773,7 @@ export default function ThreeDScene() {
         const baseRad = node.def.radius;
         const xOrb = Math.cos(node.currentAngle) * baseRad;
         const zOrb = Math.sin(node.currentAngle) * baseRad;
-        let yOrb = Math.sin(tSeconds * 1.5 + i) * node.def.yBob;
+        const yOrb = Math.sin(tSeconds * 1.5 + i) * node.def.yBob;
 
         // Apply orbital ring tilt (X and Z rotations)
         const cosX = Math.cos(node.def.tiltAngleX);
@@ -842,88 +864,108 @@ export default function ThreeDScene() {
         title="Arrastra para rotar el ecosistema 3D en 360°"
       />
 
-      {/* Top Left Status Badge */}
-      <div className="pointer-events-none absolute top-3 left-4 flex items-center gap-2 rounded-full border border-cyan-500/30 bg-slate-950/80 px-3.5 py-1.5 font-mono text-[11px] text-cyan-300 backdrop-blur-md shadow-lg shadow-cyan-500/10">
-        <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
-        </span>
-        <span className="font-bold">Ecosistema 3D Completo</span>
-        <span className="text-slate-400">· 16 Nodos Conectados</span>
-      </div>
+      {webglFailed && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 px-6 text-center backdrop-blur-sm">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-300">
+            <Orbit size={22} />
+          </div>
+          <p className="font-mono text-xs font-bold text-cyan-300">
+            Vista 3D no disponible
+          </p>
+          <p className="max-w-xs text-[11px] leading-relaxed text-slate-400">
+            Tu navegador tiene WebGL deshabilitado. Activa la aceleración por
+            hardware o abre el portafolio en Chrome, Edge o Firefox para ver el
+            ecosistema 3D.
+          </p>
+        </div>
+      )}
 
-      {/* Hint overlay */}
-      <div className="pointer-events-none absolute bottom-14 left-1/2 -translate-x-1/2 text-center text-[11px] font-mono text-slate-400 opacity-80 hidden sm:block">
-        ✦ Arrastra para girar en 360° · Vista orbital permanente de Frontend, Backend, Bases & DevOps ✦
-      </div>
+      {!webglFailed && (
+        <>
+          {/* Top Left Status Badge */}
+        <div className="pointer-events-none absolute top-3 left-4 flex items-center gap-2 rounded-full border border-cyan-500/30 bg-slate-950/80 px-3.5 py-1.5 font-mono text-[11px] text-cyan-300 backdrop-blur-md shadow-lg shadow-cyan-500/10">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+          </span>
+          <span className="font-bold">Ecosistema 3D Completo</span>
+          <span className="text-slate-400">· 16 Nodos Conectados</span>
+        </div>
 
-      {/* Cyber Controls Dock: Core shape switcher, wireframe toggle, speed */}
-      <div className="absolute bottom-2 flex flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-slate-800/80 bg-slate-950/85 p-1.5 backdrop-blur-xl shadow-xl">
-        <button
-          onClick={() => switchShape("icosahedron")}
-          className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-mono transition-all ${
-            shape === "icosahedron"
-              ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/20"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-          }`}
-          title="Núcleo Geodésico"
-        >
-          <Sparkles size={12} />
-          Icosaedro
-        </button>
+        {/* Hint overlay */}
+        <div className="pointer-events-none absolute bottom-14 left-1/2 -translate-x-1/2 text-center text-[11px] font-mono text-slate-400 opacity-80 hidden sm:block">
+          ✦ Arrastra para girar en 360° · Vista orbital permanente de Frontend, Backend, Bases & DevOps ✦
+        </div>
 
-        <button
-          onClick={() => switchShape("torusKnot")}
-          className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-mono transition-all ${
-            shape === "torusKnot"
-              ? "bg-violet-500/20 text-violet-300 border border-violet-500/40 shadow-sm shadow-violet-500/20"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-          }`}
-          title="Bucle Toroidal"
-        >
-          <Orbit size={12} />
-          Torus
-        </button>
+        {/* Cyber Controls Dock: Core shape switcher, wireframe toggle, speed */}
+        <div className="absolute bottom-2 flex flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-slate-800/80 bg-slate-950/85 p-1.5 backdrop-blur-xl shadow-xl">
+          <button
+            onClick={() => switchShape("icosahedron")}
+            className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-mono transition-all ${
+              shape === "icosahedron"
+                ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/20"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+            }`}
+            title="Núcleo Geodésico"
+          >
+            <Sparkles size={12} />
+            Icosaedro
+          </button>
 
-        <button
-          onClick={() => switchShape("octahedron")}
-          className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-mono transition-all ${
-            shape === "octahedron"
-              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm shadow-emerald-500/20"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-          }`}
-          title="Núcleo Octaedro"
-        >
-          <Layers size={12} />
-          Octaedro
-        </button>
+          <button
+            onClick={() => switchShape("torusKnot")}
+            className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-mono transition-all ${
+              shape === "torusKnot"
+                ? "bg-violet-500/20 text-violet-300 border border-violet-500/40 shadow-sm shadow-violet-500/20"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+            }`}
+            title="Bucle Toroidal"
+          >
+            <Orbit size={12} />
+            Torus
+          </button>
 
-        <div className="h-4 w-px bg-slate-800 mx-0.5" />
+          <button
+            onClick={() => switchShape("octahedron")}
+            className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-mono transition-all ${
+              shape === "octahedron"
+                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm shadow-emerald-500/20"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+            }`}
+            title="Núcleo Octaedro"
+          >
+            <Layers size={12} />
+            Octaedro
+          </button>
 
-        <button
-          onClick={toggleWireframe}
-          className={`rounded-xl px-2.5 py-1 text-xs font-mono transition-all ${
-            wireframeOnly
-              ? "bg-sky-500/20 text-sky-300 border border-sky-500/40"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-          }`}
-          title="Alternar modo alambre / sólido"
-        >
-          {wireframeOnly ? "Holo Wire" : "Sólido + Wire"}
-        </button>
+          <div className="h-4 w-px bg-slate-800 mx-0.5" />
 
-        <button
-          onClick={toggleSpeed}
-          className="flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-mono text-slate-400 hover:text-cyan-300 hover:bg-slate-800/60 transition-all"
-          title="Velocidad de rotación"
-        >
-          <RotateCw
-            size={11}
-            className={speed === 2 ? "animate-spin text-cyan-400" : ""}
-          />
-          {speed}x
-        </button>
-      </div>
+          <button
+            onClick={toggleWireframe}
+            className={`rounded-xl px-2.5 py-1 text-xs font-mono transition-all ${
+              wireframeOnly
+                ? "bg-sky-500/20 text-sky-300 border border-sky-500/40"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+            }`}
+            title="Alternar modo alambre / sólido"
+          >
+            {wireframeOnly ? "Holo Wire" : "Sólido + Wire"}
+          </button>
+
+          <button
+            onClick={toggleSpeed}
+            className="flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-mono text-slate-400 hover:text-cyan-300 hover:bg-slate-800/60 transition-all"
+            title="Velocidad de rotación"
+          >
+            <RotateCw
+              size={11}
+              className={speed === 2 ? "animate-spin text-cyan-400" : ""}
+            />
+            {speed}x
+          </button>
+        </div>
+        </>
+      )}
     </div>
   );
 }

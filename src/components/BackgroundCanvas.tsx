@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 
 type Star = {
@@ -71,8 +69,8 @@ export default function BackgroundCanvas() {
     ).matches;
 
     let stars: Star[] = [];
-    let shootingStars: ShootingStar[] = [];
-    let cursorSparks: CursorSpark[] = [];
+    const shootingStars: ShootingStar[] = [];
+    const cursorSparks: CursorSpark[] = [];
     let animationId = 0;
     let width = 0;
     let height = 0;

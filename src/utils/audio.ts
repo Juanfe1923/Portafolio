@@ -186,7 +186,9 @@ class SoundManager {
           try {
             osc.stop();
             osc.disconnect();
-          } catch {}
+          } catch {
+            // El oscilador ya se detuvo; no hay nada que limpiar.
+          }
         });
         this.ambientOscillators = [];
         this.ambientGains = [];
@@ -246,7 +248,9 @@ class SoundManager {
 
       osc.start(now);
       osc.stop(now + duration);
-    } catch {}
+    } catch {
+      // Web Audio no disponible en este navegador.
+    }
   }
 
   public playSuccess() {
@@ -287,7 +291,9 @@ class SoundManager {
       gain.connect(ctx.destination);
       osc.start(now);
       osc.stop(now + 0.28);
-    } catch {}
+    } catch {
+      // Web Audio no disponible en este navegador.
+    }
   }
 }
 

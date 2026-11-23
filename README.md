@@ -1,14 +1,14 @@
 # Portafolio — Juan Felipe Uribe Romero
 
-Portafolio web full stack de Juan Felipe Uribe Romero, Desarrollador Full Stack en Medellín, Colombia.
+Portafolio web de Juan Felipe Uribe Romero, Desarrollador Full Stack en Medellín, Colombia.
 
 ## Stack
 
-- **Next.js 16** (App Router, TypeScript, Turbopack)
+- **React 19 + Vite** (TypeScript)
 - **Tailwind CSS 4** (glassmorphism, paleta Dark Space Void)
 - **Framer Motion** (animaciones de entrada, `whileInView`, carrusel de estados)
 - **Lucide React 1.x** (íconos; el ícono de GitHub es un SVG propio porque lucide eliminó las marcas)
-- **Plus Jakarta Sans + JetBrains Mono** vía `next/font`
+- **Plus Jakarta Sans + JetBrains Mono** vía `@fontsource-variable` (auto-alojadas)
 
 ## Secciones
 
@@ -23,20 +23,20 @@ Portafolio web full stack de Juan Felipe Uribe Romero, Desarrollador Full Stack 
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
+npm run dev      # http://localhost:5173
 npm run build
-npm run start
+npm run start    # vista previa del build
 npm run lint
+npm run typecheck
 ```
 
 ## Estructura
 
 ```
 src/
-├── app/
-│   ├── globals.css       # tema Tailwind v4, auroras, estilos del fondo
-│   ├── layout.tsx        # fuentes, metadata, fondo cósmico
-│   └── page.tsx          # composición de secciones
+├── main.tsx             # entry point: fuentes, estilos, fondo y App
+├── App.tsx              # composición de secciones
+├── index.css            # tema Tailwind v4, auroras, estilos del fondo
 ├── components/
 │   ├── BackgroundCanvas.tsx
 │   ├── Navbar.tsx
@@ -47,9 +47,14 @@ src/
 │   ├── ProjectSigif.tsx
 │   ├── Timeline.tsx
 │   ├── Contact.tsx
+│   ├── CommandPalette.tsx
+│   ├── ThreeDScene.tsx
+│   ├── TiltCard.tsx
 │   └── icons/GithubIcon.tsx
-└── data/
-    └── portfolioData.ts  # Todo el contenido editable en un solo lugar
+├── data/
+│   └── portfolioData.ts # Todo el contenido editable en un solo lugar
+└── utils/
+    └── audio.ts
 ```
 
-> El formulario de contacto usa `mailto:` porque no se especificó un backend o servicio de correo. Si se desea envío real, reemplazar `handleSubmit` en `src/components/Contact.tsx` por una llamada a una ruta API.
+> El formulario de contacto usa `mailto:` porque no se especificó un backend o servicio de correo. Si se desea envío real, reemplazar `handleSubmit` en `src/components/Contact.tsx` por una llamada a una API.

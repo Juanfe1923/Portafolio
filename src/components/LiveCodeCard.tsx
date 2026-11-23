@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { FileCode2, RotateCcw, CheckCircle2, LoaderCircle } from "lucide-react";

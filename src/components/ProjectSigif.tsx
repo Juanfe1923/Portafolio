@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -16,7 +14,6 @@ import {
   Zap,
   ShieldCheck,
   Activity,
-  Layers,
 } from "lucide-react";
 import { sigifProject } from "@/data/portfolioData";
 import SectionHeading from "./SectionHeading";

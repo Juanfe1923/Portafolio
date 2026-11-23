@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { motion, type Variants } from "framer-motion";
 import {
@@ -8,7 +6,6 @@ import {
   Rocket,
   ArrowRight,
   ChevronDown,
-  Sparkles,
   Code2,
   Box,
   Layers,

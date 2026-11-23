@@ -1,11 +1,8 @@
-"use client";
-
 import { motion } from "framer-motion";
 import { GraduationCap, Rocket, CheckCircle2, Sparkles, type LucideIcon } from "lucide-react";
 import { timeline } from "@/data/portfolioData";
 import SectionHeading from "./SectionHeading";
 import TiltCard from "./TiltCard";
-import { soundManager } from "@/utils/audio";
 
 const icons: Record<string, LucideIcon> = {
   graduation: GraduationCap,

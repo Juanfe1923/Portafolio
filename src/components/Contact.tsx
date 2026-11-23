@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect, type FormEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {

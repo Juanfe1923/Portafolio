@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useRef, useState, type ReactNode } from "react";
 import { soundManager } from "@/utils/audio";
 

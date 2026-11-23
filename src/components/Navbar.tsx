@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -14,7 +12,6 @@ import {
   ArrowUp,
   Sparkles,
 } from "lucide-react";
-import { navLinks, profile } from "@/data/portfolioData";
 import { soundManager } from "@/utils/audio";
 
 interface NavItemConfig {
