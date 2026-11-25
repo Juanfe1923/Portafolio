@@ -168,6 +168,60 @@ body {
   font-style: italic;
 }
 
+/* Mini 3D Animations */
+@keyframes spin-3d-cube {
+  0% {
+    transform: rotateX(-20deg) rotateY(0deg);
+  }
+  100% {
+    transform: rotateX(340deg) rotateY(360deg);
+  }
+}
+
+@keyframes orbit-3d-ring {
+  0% {
+    transform: rotateX(68deg) rotateY(15deg) rotateZ(0deg);
+  }
+  100% {
+    transform: rotateX(68deg) rotateY(15deg) rotateZ(360deg);
+  }
+}
+
+@keyframes orbit-3d-ring-alt {
+  0% {
+    transform: rotateX(-62deg) rotateY(-25deg) rotateZ(360deg);
+  }
+  100% {
+    transform: rotateX(-62deg) rotateY(-25deg) rotateZ(0deg);
+  }
+}
+
+@keyframes float-3d-y {
+  0%,
+  100% {
+    transform: translateY(0px) translateZ(18px);
+  }
+  50% {
+    transform: translateY(-6px) translateZ(26px);
+  }
+}
+
+.animate-spin-3d {
+  animation: spin-3d-cube 14s linear infinite;
+}
+.animate-spin-3d-fast {
+  animation: spin-3d-cube 4.5s linear infinite;
+}
+.animate-orbit-3d {
+  animation: orbit-3d-ring 9s linear infinite;
+}
+.animate-orbit-3d-alt {
+  animation: orbit-3d-ring-alt 12s linear infinite;
+}
+.animate-float-3d {
+  animation: float-3d-y 4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -175,7 +229,12 @@ body {
   .aurora-1,
   .aurora-2,
   .aurora-3,
-  .ping-soft {
+  .ping-soft,
+  .animate-spin-3d,
+  .animate-spin-3d-fast,
+  .animate-orbit-3d,
+  .animate-orbit-3d-alt,
+  .animate-float-3d {
     animation: none;
   }
 }

@@ -34,6 +34,7 @@ import {
 } from "@/data/portfolioData";
 import SectionHeading from "./SectionHeading";
 import TiltCard from "./TiltCard";
+import { Mini3DBadge, FilteredCategory3DSpotlight } from "./SkillMini3D";
 import { soundManager } from "@/utils/audio";
 
 type IconComponent = ComponentType<{
@@ -135,6 +136,17 @@ export default function Skills() {
       ? skillCategories
       : skillCategories.filter((c) => c.id === activeFilter);
 
+  const handleFilterChange = (tabId: string) => {
+    soundManager.playClick();
+    setActiveFilter(tabId);
+    if (tabId !== "all") {
+      const cat = skillCategories.find((c) => c.id === tabId);
+      if (cat && !cat.items.some((i) => i.name === selectedSkill.name)) {
+        setSelectedSkill(cat.items[0]);
+      }
+    }
+  };
+
   const handleSelectSkill = (skill: SkillItem) => {
     soundManager.playClick();
     setSelectedSkill(skill);
@@ -158,10 +170,7 @@ export default function Skills() {
           return (
             <button
               key={tab.id}
-              onClick={() => {
-                soundManager.playClick();
-                setActiveFilter(tab.id);
-              }}
+              onClick={() => handleFilterChange(tab.id)}
               className={`relative rounded-2xl px-4 py-2 font-mono text-xs font-semibold transition-all duration-300 ${
                 isActive
                   ? "text-slate-950 shadow-lg shadow-cyan-500/25"
@@ -212,7 +221,7 @@ export default function Skills() {
                     className="h-full"
                   >
                     <article
-                      className={`glass relative flex h-full flex-col justify-between overflow-hidden rounded-3xl p-6 transition-colors duration-300 ${accent.border}`}
+                      className={`glass group/card relative flex h-full flex-col justify-between overflow-hidden rounded-3xl p-6 transition-colors duration-300 ${accent.border}`}
                     >
                       {/* Glow background */}
                       <div
@@ -220,25 +229,35 @@ export default function Skills() {
                       />
 
                       <div>
-                        {/* Header */}
-                        <div className="flex items-center gap-3.5">
-                          <span
-                            className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${accent.chip} text-slate-950 shadow-md`}
-                          >
-                            <CategoryIcon size={20} strokeWidth={2.4} />
-                          </span>
-                          <div>
-                            <h3 className="text-lg font-bold text-slate-100">
-                              {category.title}
-                            </h3>
-                            <p className="text-xs text-slate-400">
-                              {category.description}
-                            </p>
+                        {/* Header + Mini 3D Cube */}
+                        <div
+                          className="flex items-start justify-between gap-2"
+                          style={{ transform: "translateZ(20px)" }}
+                        >
+                          <div className="flex items-center gap-3.5">
+                            <span
+                              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${accent.chip} text-slate-950 shadow-md transition-transform duration-300 group-hover/card:scale-105`}
+                            >
+                              <CategoryIcon size={20} strokeWidth={2.4} />
+                            </span>
+                            <div>
+                              <h3 className="text-lg font-bold text-slate-100">
+                                {category.title}
+                              </h3>
+                              <p className="text-xs text-slate-400">
+                                {category.description}
+                              </p>
+                            </div>
                           </div>
+
+                          <Mini3DBadge accent={category.accent} />
                         </div>
 
                         {/* Interactive Skill Chips */}
-                        <div className="mt-5 flex flex-wrap gap-2">
+                        <div
+                          className="mt-5 flex flex-wrap gap-2"
+                          style={{ transform: "translateZ(14px)" }}
+                        >
                           {category.items.map((skill) => {
                             const Icon = itemIcons[skill.icon] ?? Braces;
                             const isSelected = selectedSkill.name === skill.name;
@@ -251,7 +270,7 @@ export default function Skills() {
                                 className={`group flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-mono transition-all duration-200 ${
                                   isSelected
                                     ? "border-cyan-400 bg-cyan-500/20 text-cyan-200 shadow-md shadow-cyan-500/20 scale-105"
-                                    : "border-slate-800/80 bg-slate-950/60 text-slate-300 hover:border-slate-600 hover:text-slate-100 hover:-translate-y-0.5"
+                                    : "border-slate-800/80 bg-slate-950/60 text-slate-300 hover:border-slate-600 hover:text-slate-100 hover:-translate-y-1 hover:shadow-lg hover:shadow-cyan-500/10"
                                 }`}
                               >
                                 <Icon
@@ -277,6 +296,14 @@ export default function Skills() {
                 </motion.div>
               );
             })}
+
+            {activeFilter !== "all" && filteredCategories.length === 1 && (
+              <FilteredCategory3DSpotlight
+                category={filteredCategories[0]}
+                selectedSkill={selectedSkill}
+                onSelectSkill={handleSelectSkill}
+              />
+            )}
           </AnimatePresence>
         </div>
 
@@ -320,27 +347,8 @@ export default function Skills() {
                     {selectedSkill.detail}
                   </p>
 
-                  {/* Level meter */}
-                  <div className="mt-6 rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4">
-                    <div className="flex items-center justify-between font-mono text-xs">
-                      <span className="text-slate-400">Dominio Práctico</span>
-                      <span className="font-bold text-cyan-300">
-                        {selectedSkill.level}%
-                      </span>
-                    </div>
-                    <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-slate-800">
-                      <motion.div
-                        key={selectedSkill.name}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${selectedSkill.level}%` }}
-                        transition={{ duration: 0.6, ease: "easeOut" }}
-                        className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-sky-400 to-violet-500 shadow-[0_0_12px_rgba(56,189,248,0.6)]"
-                      />
-                    </div>
-                  </div>
-
                   {/* Architectural Impact */}
-                  <div className="mt-4 space-y-2 rounded-2xl border border-slate-800/80 bg-slate-950/40 p-4 text-xs font-mono text-slate-400">
+                  <div className="mt-6 space-y-2 rounded-2xl border border-slate-800/80 bg-slate-950/40 p-4 text-xs font-mono text-slate-400">
                     <div className="flex items-center gap-2 text-slate-300">
                       <Sparkles size={13} className="text-cyan-400" />
                       <span>Listo para Producción</span>

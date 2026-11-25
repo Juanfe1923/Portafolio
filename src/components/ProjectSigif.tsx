@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ExternalLink,
@@ -31,6 +31,21 @@ export default function ProjectSigif() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [recentAction, setRecentAction] = useState<string | null>(null);
 
+  // Continuous live-telemetry fluctuation on the chart bars
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setChartBars((prev) =>
+        prev.map((val, idx) => {
+          const delta = Math.round((Math.random() - 0.48) * 10);
+          const min = idx === prev.length - 1 ? 55 : 28;
+          return Math.max(min, Math.min(98, val + delta));
+        })
+      );
+    }, 2400);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const simulateSale = () => {
     soundManager.playSuccess();
     setIsSyncing(true);
@@ -62,7 +77,7 @@ export default function ProjectSigif() {
     >
       <SectionHeading
         eyebrow="// proyecto insignia & producción"
-        title="Showcase 3D: Sigif"
+        title="Sigif"
         subtitle="Un ecosistema empresarial real en producción: sincronización de inventario en tiempo real entre plataforma web y aplicación móvil."
       />
 
@@ -88,7 +103,12 @@ export default function ProjectSigif() {
               <div className="flex items-center gap-3">
                 <span className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 via-sky-500 to-violet-600 text-2xl font-black text-slate-950 shadow-lg shadow-cyan-500/30">
                   S
-                  <span className="absolute -inset-0.5 rounded-2xl bg-cyan-400/40 blur-sm -z-10" />
+                  <motion.span
+                    aria-hidden
+                    animate={{ opacity: [0.35, 0.85, 0.35], scale: [1, 1.08, 1] }}
+                    transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute -inset-0.5 rounded-2xl bg-cyan-400/50 blur-sm -z-10"
+                  />
                 </span>
                 <div>
                   <div className="flex items-center gap-2">
@@ -164,7 +184,7 @@ export default function ProjectSigif() {
                     size={16}
                     className="transition-transform duration-300 group-hover/btn:-translate-y-0.5 group-hover/btn:translate-x-0.5"
                   />
-                  <span className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/translate-x-[100%] transition-transform duration-700" />
+                  <span className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-700" />
                 </a>
 
                 <span className="font-mono text-xs text-slate-400">
@@ -289,16 +309,41 @@ export default function ProjectSigif() {
                           {chartBars.map((height, idx) => (
                             <motion.div
                               key={idx}
-                              initial={{ scaleY: 0 }}
-                              animate={{ scaleY: 1 }}
-                              style={{ height: `${height}%`, originY: 1 }}
-                              transition={{ duration: 0.5, delay: idx * 0.05 }}
-                              className={`flex-1 rounded-t-md transition-all duration-300 ${
+                              initial={{ height: "20%" }}
+                              animate={{
+                                height: `${height}%`,
+                                opacity: [0.85, 1, 0.85],
+                              }}
+                              transition={{
+                                height: { duration: 0.75, ease: "easeInOut" },
+                                opacity: {
+                                  duration: 2.2,
+                                  repeat: Infinity,
+                                  delay: idx * 0.25,
+                                  ease: "easeInOut",
+                                },
+                              }}
+                              className={`relative flex-1 overflow-hidden rounded-t-md ${
                                 idx === chartBars.length - 1
-                                  ? "bg-gradient-to-t from-violet-500 to-cyan-400 shadow-[0_0_12px_rgba(56,189,248,0.5)]"
-                                  : "bg-gradient-to-t from-cyan-500/20 to-cyan-400/60"
+                                  ? "bg-gradient-to-t from-violet-500 to-cyan-400 shadow-[0_0_14px_rgba(56,189,248,0.55)]"
+                                  : "bg-gradient-to-t from-cyan-500/25 to-cyan-400/65"
                               }`}
-                            />
+                            >
+                              {/* Glowing top cap */}
+                              <span className="absolute inset-x-0 top-0 h-0.5 bg-white/70" />
+                              {/* Constant vertical shimmer */}
+                              <motion.span
+                                aria-hidden
+                                animate={{ y: ["100%", "-100%"] }}
+                                transition={{
+                                  duration: 2.6,
+                                  repeat: Infinity,
+                                  delay: idx * 0.3,
+                                  ease: "linear",
+                                }}
+                                className="pointer-events-none absolute inset-x-0 h-1/2 bg-gradient-to-t from-transparent via-white/20 to-transparent"
+                              />
+                            </motion.div>
                           ))}
                         </div>
                       </div>
@@ -339,19 +384,29 @@ export default function ProjectSigif() {
                       </div>
 
                       {/* Sync status */}
-                      <div className="flex items-center justify-between rounded-xl border border-slate-800/80 bg-slate-950/40 px-3.5 py-2 font-mono text-[11px]">
-                        <span className="flex items-center gap-2 text-emerald-300">
+                      <div className="relative overflow-hidden flex items-center justify-between rounded-xl border border-slate-800/80 bg-slate-950/40 px-3.5 py-2 font-mono text-[11px]">
+                        <motion.span
+                          aria-hidden
+                          animate={{ x: ["-100%", "200%"] }}
+                          transition={{
+                            duration: isSyncing ? 1.1 : 3.2,
+                            repeat: Infinity,
+                            ease: "linear",
+                          }}
+                          className="pointer-events-none absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-emerald-400/10 to-transparent"
+                        />
+                        <span className="relative flex items-center gap-2 text-emerald-300">
                           <span className="relative flex h-2 w-2">
                             <span
                               className={`absolute h-full w-full rounded-full bg-emerald-400 ${
-                                isSyncing ? "animate-ping" : ""
+                                isSyncing ? "animate-ping" : "ping-soft"
                               }`}
                             />
                             <span className="relative h-2 w-2 rounded-full bg-emerald-400" />
                           </span>
                           {isSyncing ? "Sincronizando con Móvil…" : "Canal Web ↔ Móvil Sincronizado"}
                         </span>
-                        <span className="text-slate-500">PostgreSQL</span>
+                        <span className="relative text-slate-500">PostgreSQL</span>
                       </div>
                     </div>
                   )}
