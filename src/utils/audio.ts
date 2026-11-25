@@ -95,20 +95,11 @@ class SoundManager {
       this.isAmbientPlaying = true;
       const now = ctx.currentTime;
 
-      // Gentle safety limiter (only catches true peaks above -3 dB, never ducks notes)
-      const compressor = ctx.createDynamicsCompressor();
-      compressor.threshold.setValueAtTime(-3, now);
-      compressor.knee.setValueAtTime(12, now);
-      compressor.ratio.setValueAtTime(2, now);
-      compressor.attack.setValueAtTime(0.02, now);
-      compressor.release.setValueAtTime(0.25, now);
-      compressor.connect(ctx.destination);
-
-      // Master ambient volume (rich, clearly audible)
+      // Master ambient volume (clean, direct to destination with zero compressor ducking)
       const master = ctx.createGain();
       master.gain.setValueAtTime(0.001, now);
-      master.gain.linearRampToValueAtTime(0.32, now + 1.2);
-      master.connect(compressor);
+      master.gain.linearRampToValueAtTime(0.28, now + 1.2);
+      master.connect(ctx.destination);
       this.masterGain = master;
 
       // Warm lowpass filter for rich organ/piano warmth
@@ -175,10 +166,8 @@ class SoundManager {
         { freq: C5, beats: 2, chordIdx: 2 }, // Am:    blanca (2 tiempos)
         { freq: E5, beats: 4 },              //        4 tiempos
         { freq: D5, beats: 2, chordIdx: 3 }, // G:     blanca (2 tiempos)
-        { freq: E5, beats: 1 },              //        negra (1 tiempo)
-        { freq: D5, beats: 1 },              //        negra (1 tiempo)
-        { freq: C5, beats: 1 },              //        negra (1 tiempo)
-        { freq: B4, beats: 1 },              //        negra (1 tiempo)
+        { freq: C5, beats: 2 },              //        blanca (2 tiempos)
+        { freq: B4, beats: 2 },              //        blanca (2 tiempos)
       ];
 
       let eventIndex = 0;
@@ -384,17 +373,17 @@ class SoundManager {
 
   public playSuccess() {
     if (!this.enabled) return;
-    this.playTone(523.25, "sine", 0.14, 0.14);
-    setTimeout(() => this.playTone(659.25, "sine", 0.14, 0.14), 90);
-    setTimeout(() => this.playTone(783.99, "sine", 0.22, 0.16), 180);
+    this.playTone(523.25, "sine", 0.14, 0.22);
+    setTimeout(() => this.playTone(659.25, "sine", 0.14, 0.22), 90);
+    setTimeout(() => this.playTone(783.99, "sine", 0.22, 0.25), 180);
   }
 
   public playClick() {
-    this.playTone(580, "sine", 0.05, 0.10);
+    this.playTone(720, "triangle", 0.065, 0.22);
   }
 
   public playHover() {
-    this.playTone(460, "sine", 0.035, 0.04);
+    this.playTone(480, "sine", 0.045, 0.09);
   }
 
   public playWarp() {
