@@ -95,10 +95,10 @@ class SoundManager {
       this.isAmbientPlaying = true;
       const now = ctx.currentTime;
 
-      // Master ambient volume (subtle & intimate)
+      // Master ambient volume (clearly audible, warm & balanced)
       const master = ctx.createGain();
       master.gain.setValueAtTime(0.001, now);
-      master.gain.linearRampToValueAtTime(0.10, now + 1.5);
+      master.gain.linearRampToValueAtTime(0.22, now + 1.4);
       master.connect(ctx.destination);
       this.masterGain = master;
 
@@ -124,12 +124,12 @@ class SoundManager {
       delayFeedback.connect(delay);
       delayFilter.connect(master);
 
-      // Subtle warm organ bass pad (root + fifth)
+      // Subtle warm organ bass pad (root + fifth) following Fmaj7 -> G6 -> Am -> G
       const bassPads = [
-        { root: 87.31, fifth: 130.81 },  // F2 + C3
-        { root: 98.00, fifth: 146.83 },  // G2 + D3
-        { root: 110.00, fifth: 164.81 }, // A2 + E3
-        { root: 98.00, fifth: 146.83 },  // G2 + D3
+        { root: 87.31, fifth: 130.81, lead: 880.00 },   // F2 + C3 (lead A5)
+        { root: 98.00, fifth: 146.83, lead: 987.77 },   // G2 + D3 (lead B5)
+        { root: 110.00, fifth: 164.81, lead: 1046.50 }, // A2 + E3 (lead C6)
+        { root: 98.00, fifth: 146.83, lead: 987.77 },   // G2 + D3 (lead B5)
       ];
 
       this.ambientOscillators = [];
@@ -140,7 +140,7 @@ class SoundManager {
         const g = ctx.createGain();
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, now);
-        g.gain.setValueAtTime(idx === 0 ? 0.18 : 0.10, now);
+        g.gain.setValueAtTime(idx === 0 ? 0.24 : 0.15, now);
         osc.connect(g);
         g.connect(filter);
         osc.start(now);
@@ -148,21 +148,22 @@ class SoundManager {
         this.ambientGains.push(g);
       });
 
-      // Iconic 4-bar arpeggio sequence (6 eighth-notes per bar at ~340ms)
+      // Exact Interstellar (Day One / Cornfield Chase) 8-bar arpeggio in A minor
+      // 12 eighth-notes (2 bars of 3/4) per chord at ~300ms per note
       const E5 = 659.25;
       const A4 = 440.00;
       const B4 = 493.88;
       const C5 = 523.25;
       const D5 = 587.33;
 
-      const bars: number[][] = [
-        [A4, E5, A4, E5, A4, E5], // Bar 1: Fmaj7
-        [B4, E5, B4, E5, B4, E5], // Bar 2: G6
-        [C5, E5, C5, E5, C5, E5], // Bar 3: Am
-        [D5, E5, D5, B4, C5, B4], // Bar 4: G/Em turnaround
+      const sections: number[][] = [
+        [A4, E5, A4, E5, A4, E5, A4, E5, A4, E5, A4, E5], // Fmaj7 (2 bars)
+        [B4, E5, B4, E5, B4, E5, B4, E5, B4, E5, B4, E5], // G6    (2 bars)
+        [C5, E5, C5, E5, C5, E5, C5, E5, C5, E5, C5, E5], // Am    (2 bars)
+        [D5, E5, D5, E5, D5, E5, D5, E5, D5, E5, C5, B4], // G     (2 bars + turnaround)
       ];
 
-      let barIndex = 0;
+      let sectionIndex = 0;
       let stepIndex = 0;
 
       const playFeltPianoNote = (freq: number, accent: boolean) => {
@@ -182,10 +183,10 @@ class SoundManager {
         const harmonicGain = this.ctx.createGain();
         harmonicGain.gain.setValueAtTime(0.18, t);
 
-        const peak = accent ? 0.24 : 0.16;
+        const peak = accent ? 0.34 : 0.24;
         noteGain.gain.setValueAtTime(0.001, t);
-        noteGain.gain.linearRampToValueAtTime(peak, t + 0.022);
-        noteGain.gain.exponentialRampToValueAtTime(0.0008, t + 1.45);
+        noteGain.gain.linearRampToValueAtTime(peak, t + 0.02);
+        noteGain.gain.exponentialRampToValueAtTime(0.0008, t + 1.5);
 
         osc.connect(noteGain);
         harmonic.connect(harmonicGain);
@@ -196,38 +197,63 @@ class SoundManager {
 
         osc.start(t);
         harmonic.start(t);
-        osc.stop(t + 1.5);
-        harmonic.stop(t + 1.5);
+        osc.stop(t + 1.55);
+        harmonic.stop(t + 1.55);
+      };
+
+      const playOrganSwell = (freq: number) => {
+        if (!this.isAmbientPlaying || !this.ctx || !this.ambientFilter) return;
+        const t = this.ctx.currentTime;
+
+        const osc = this.ctx.createOscillator();
+        const swellGain = this.ctx.createGain();
+
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, t);
+
+        swellGain.gain.setValueAtTime(0.001, t);
+        swellGain.gain.linearRampToValueAtTime(0.10, t + 0.9);
+        swellGain.gain.exponentialRampToValueAtTime(0.0008, t + 3.2);
+
+        osc.connect(swellGain);
+        swellGain.connect(this.ambientFilter);
+        swellGain.connect(delay);
+
+        osc.start(t);
+        osc.stop(t + 3.3);
       };
 
       const tickArpeggio = () => {
         if (!this.isAmbientPlaying || !this.ctx) return;
 
-        // Update bass pad smoothly at the start of each bar
+        // Update bass pad at the start of each 2-bar chord
         if (stepIndex === 0) {
           const t = this.ctx.currentTime;
-          const pad = bassPads[barIndex];
+          const pad = bassPads[sectionIndex];
           if (this.ambientOscillators[0]) {
             this.ambientOscillators[0].frequency.setTargetAtTime(pad.root, t, 0.35);
           }
           if (this.ambientOscillators[1]) {
             this.ambientOscillators[1].frequency.setTargetAtTime(pad.fifth, t, 0.35);
           }
+          // Soaring high organ note on bar 2 of each chord
+        } else if (stepIndex === 6) {
+          playOrganSwell(bassPads[sectionIndex].lead);
         }
 
-        const noteFreq = bars[barIndex][stepIndex];
-        playFeltPianoNote(noteFreq, stepIndex === 0 || stepIndex === 3);
+        const noteFreq = sections[sectionIndex][stepIndex];
+        playFeltPianoNote(noteFreq, stepIndex % 6 === 0 || stepIndex % 6 === 3);
 
         stepIndex++;
-        if (stepIndex >= 6) {
+        if (stepIndex >= 12) {
           stepIndex = 0;
-          barIndex = (barIndex + 1) % bars.length;
+          sectionIndex = (sectionIndex + 1) % sections.length;
         }
       };
 
-      // Start gently after 350ms, repeating every 340ms
-      setTimeout(tickArpeggio, 350);
-      this.melodyTimer = setInterval(tickArpeggio, 340);
+      // Start at ~100 BPM eighth-note pace (300ms)
+      setTimeout(tickArpeggio, 300);
+      this.melodyTimer = setInterval(tickArpeggio, 300);
     } catch {
       this.isAmbientPlaying = false;
     }
