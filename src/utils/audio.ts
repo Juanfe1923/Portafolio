@@ -10,7 +10,9 @@ class SoundManager {
   private ambientFilter: BiquadFilterNode | null = null;
   private ambientOscillators: OscillatorNode[] = [];
   private ambientGains: GainNode[] = [];
+  private lfoOsc: OscillatorNode | null = null;
   private chordTimer: ReturnType<typeof setInterval> | null = null;
+  private melodyTimer: ReturnType<typeof setInterval> | null = null;
   private isAmbientPlaying: boolean = false;
 
   constructor() {
@@ -80,9 +82,10 @@ class SoundManager {
   }
 
   /**
-   * Generates a warm, clearly audible, celestial ambient synthesizer soundscape.
-   * Uses audible mid-range frequencies (220Hz - 660Hz) with gentle filter sweeps,
-   * perfectly audible on laptop, desktop, and mobile speakers without distortion.
+   * Generates a soft, warm, non-fatiguing lo-fi/ambient soundscape:
+   * - Velvety pure-sine pad with gentle breathing LFO
+   * - 4-chord progression (Fmaj9 -> Em7 -> Dm9 -> Cmaj9)
+   * - Delicate pentatonic bell/kalimba notes with a warm echo
    */
   public startAmbient() {
     const ctx = this.getOrCreateContext();
@@ -92,45 +95,68 @@ class SoundManager {
       this.isAmbientPlaying = true;
       const now = ctx.currentTime;
 
-      // Master ambient volume (healthy, audible 0.32 level)
+      // Master ambient volume (soft, relaxing 0.11 level)
       const master = ctx.createGain();
-      master.gain.setValueAtTime(0.01, now);
-      master.gain.linearRampToValueAtTime(0.32, now + 1.2);
+      master.gain.setValueAtTime(0.001, now);
+      master.gain.linearRampToValueAtTime(0.11, now + 1.8);
       master.connect(ctx.destination);
       this.masterGain = master;
 
-      // Filter: Open lowpass (2400 Hz) so mid-high harmonics sing clearly
+      // Warm lowpass filter so there are zero harsh highs
       const filter = ctx.createBiquadFilter();
       filter.type = "lowpass";
-      filter.frequency.setValueAtTime(2400, now);
-      filter.Q.setValueAtTime(1.5, now);
+      filter.frequency.setValueAtTime(950, now);
+      filter.Q.setValueAtTime(0.7, now);
       filter.connect(master);
       this.ambientFilter = filter;
 
-      // Celestial ambient chord progression (Dmaj9 ⇄ Gmaj9)
-      const chordA = [
-        { f: 146.83, type: "sine" as OscillatorType, vol: 0.28 },    // D3
-        { f: 220.0, type: "triangle" as OscillatorType, vol: 0.22 }, // A3
-        { f: 277.18, type: "sine" as OscillatorType, vol: 0.24 },   // C#4
-        { f: 329.63, type: "triangle" as OscillatorType, vol: 0.20 }, // E4
-        { f: 440.0, type: "sine" as OscillatorType, vol: 0.16 },    // A4
-        { f: 554.37, type: "sine" as OscillatorType, vol: 0.12 },   // C#5
+      // Gentle breathing LFO modulating the filter cutoff (0.12 Hz = ~8s breath)
+      const lfo = ctx.createOscillator();
+      const lfoGain = ctx.createGain();
+      lfo.type = "sine";
+      lfo.frequency.setValueAtTime(0.12, now);
+      lfoGain.gain.setValueAtTime(280, now);
+      lfo.connect(lfoGain);
+      lfoGain.connect(filter.frequency);
+      lfo.start(now);
+      this.lfoOsc = lfo;
+
+      // Soft delay echo for airy melody plucks
+      const delay = ctx.createDelay(1.0);
+      delay.delayTime.setValueAtTime(0.42, now);
+      const delayFeedback = ctx.createGain();
+      delayFeedback.gain.setValueAtTime(0.28, now);
+      const delayFilter = ctx.createBiquadFilter();
+      delayFilter.type = "lowpass";
+      delayFilter.frequency.setValueAtTime(1200, now);
+
+      delay.connect(delayFilter);
+      delayFilter.connect(delayFeedback);
+      delayFeedback.connect(delay);
+      delayFilter.connect(master);
+
+      // Warm 4-chord progression (Fmaj9 -> Em7 -> Dm9 -> Cmaj9)
+      const chords = [
+        [174.61, 220.0, 261.63, 329.63, 392.0], // Fmaj9
+        [164.81, 196.0, 246.94, 293.66, 392.0], // Em7
+        [146.83, 220.0, 261.63, 329.63, 392.0], // Dm9
+        [130.81, 196.0, 246.94, 293.66, 329.63], // Cmaj9
       ];
 
       this.ambientOscillators = [];
       this.ambientGains = [];
 
-      chordA.forEach((note, idx) => {
+      chords[0].forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const g = ctx.createGain();
 
-        osc.type = note.type;
-        // Subtle chorus detuning
-        const detune = (idx % 2 === 0 ? 1 : -1) * (idx * 3.5);
-        osc.frequency.setValueAtTime(note.f, now);
+        osc.type = "sine";
+        const detune = (idx % 2 === 0 ? 1 : -1) * (idx * 2.2);
+        osc.frequency.setValueAtTime(freq, now);
         osc.detune.setValueAtTime(detune, now);
 
-        g.gain.setValueAtTime(note.vol, now);
+        const vol = idx === 0 ? 0.24 : 0.14 - idx * 0.015;
+        g.gain.setValueAtTime(Math.max(0.06, vol), now);
         osc.connect(g);
         g.connect(filter);
         osc.start(now);
@@ -139,29 +165,52 @@ class SoundManager {
         this.ambientGains.push(g);
       });
 
-      // Smooth ambient chord breath cycle every 8 seconds
+      // Smooth chord progression every 6.5 seconds
       let chordStep = 0;
       this.chordTimer = setInterval(() => {
-        if (!this.isAmbientPlaying || !this.ctx || !this.ambientFilter) return;
+        if (!this.isAmbientPlaying || !this.ctx) return;
         const t = this.ctx.currentTime;
-        chordStep = (chordStep + 1) % 2;
-
-        // Filter breath
-        const targetFreq = chordStep === 0 ? 2600 : 1800;
-        this.ambientFilter.frequency.setTargetAtTime(targetFreq, t, 2.5);
-
-        // Gentle shift to Gmaj9 chord and back
-        const baseFreqs =
-          chordStep === 0
-            ? [146.83, 220.0, 277.18, 329.63, 440.0, 554.37] // Dmaj9
-            : [196.0, 246.94, 293.66, 370.0, 440.0, 587.33]; // Gmaj9
+        chordStep = (chordStep + 1) % chords.length;
+        const nextChord = chords[chordStep];
 
         this.ambientOscillators.forEach((osc, i) => {
-          if (baseFreqs[i]) {
-            osc.frequency.setTargetAtTime(baseFreqs[i], t, 2.0);
+          if (nextChord[i]) {
+            osc.frequency.setTargetAtTime(nextChord[i], t, 1.8);
           }
         });
-      }, 8000);
+      }, 6500);
+
+      // Delicate pentatonic bell/kalimba notes for a musical, relaxing feel
+      const melodyScale = [523.25, 587.33, 659.25, 783.99, 880.0, 987.77]; // C5 D5 E5 G5 A5 B5
+      let melodyIdx = 0;
+
+      const triggerSoftNote = () => {
+        if (!this.isAmbientPlaying || !this.ctx || !this.masterGain) return;
+        const t = this.ctx.currentTime;
+        const freq = melodyScale[melodyIdx % melodyScale.length];
+        melodyIdx = (melodyIdx + 1 + Math.floor(Math.random() * 2)) % melodyScale.length;
+
+        const noteOsc = this.ctx.createOscillator();
+        const noteGain = this.ctx.createGain();
+
+        noteOsc.type = "sine";
+        noteOsc.frequency.setValueAtTime(freq, t);
+
+        noteGain.gain.setValueAtTime(0.001, t);
+        noteGain.gain.linearRampToValueAtTime(0.16, t + 0.04);
+        noteGain.gain.exponentialRampToValueAtTime(0.0008, t + 2.4);
+
+        noteOsc.connect(noteGain);
+        noteGain.connect(this.masterGain);
+        noteGain.connect(delay);
+
+        noteOsc.start(t);
+        noteOsc.stop(t + 2.5);
+      };
+
+      // Play first gentle note after 1s, then every 2.8s
+      setTimeout(triggerSoftNote, 1000);
+      this.melodyTimer = setInterval(triggerSoftNote, 2800);
     } catch {
       this.isAmbientPlaying = false;
     }
@@ -175,6 +224,10 @@ class SoundManager {
         clearInterval(this.chordTimer);
         this.chordTimer = null;
       }
+      if (this.melodyTimer) {
+        clearInterval(this.melodyTimer);
+        this.melodyTimer = null;
+      }
 
       if (this.masterGain) {
         this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
@@ -182,6 +235,15 @@ class SoundManager {
       }
 
       setTimeout(() => {
+        if (this.lfoOsc) {
+          try {
+            this.lfoOsc.stop();
+            this.lfoOsc.disconnect();
+          } catch {
+            // LFO ya detenido.
+          }
+          this.lfoOsc = null;
+        }
         this.ambientOscillators.forEach((osc) => {
           try {
             osc.stop();
@@ -255,17 +317,17 @@ class SoundManager {
 
   public playSuccess() {
     if (!this.enabled) return;
-    this.playTone(523.25, "sine", 0.12, 0.25);
-    setTimeout(() => this.playTone(659.25, "sine", 0.12, 0.25), 90);
-    setTimeout(() => this.playTone(783.99, "sine", 0.18, 0.28), 180);
+    this.playTone(523.25, "sine", 0.14, 0.14);
+    setTimeout(() => this.playTone(659.25, "sine", 0.14, 0.14), 90);
+    setTimeout(() => this.playTone(783.99, "sine", 0.22, 0.16), 180);
   }
 
   public playClick() {
-    this.playTone(680, "triangle", 0.06, 0.20);
+    this.playTone(580, "sine", 0.05, 0.10);
   }
 
   public playHover() {
-    this.playTone(420, "sine", 0.04, 0.10);
+    this.playTone(460, "sine", 0.035, 0.04);
   }
 
   public playWarp() {
