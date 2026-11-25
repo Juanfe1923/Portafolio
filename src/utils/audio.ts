@@ -82,10 +82,10 @@ class SoundManager {
   }
 
   /**
-   * Generates a soft, warm, non-fatiguing lo-fi/ambient soundscape:
-   * - Velvety pure-sine pad with gentle breathing LFO
-   * - 4-chord progression (Fmaj9 -> Em7 -> Dm9 -> Cmaj9)
-   * - Delicate pentatonic bell/kalimba notes with a warm echo
+   * Generates a subtle, intimate Interstellar-inspired cosmic felt-piano theme:
+   * - Iconic A-minor pedal-E5 arpeggio (Fmaj7 -> G6 -> Am -> G/D)
+   * - Soft, warm felt-piano timbre with spacious cosmic delay
+   * - Gentle sub-bass pad swell underneath, kept subtle and non-fatiguing
    */
   public startAmbient() {
     const ctx = this.getOrCreateContext();
@@ -95,122 +95,139 @@ class SoundManager {
       this.isAmbientPlaying = true;
       const now = ctx.currentTime;
 
-      // Master ambient volume (soft, relaxing 0.11 level)
+      // Master ambient volume (subtle & intimate)
       const master = ctx.createGain();
       master.gain.setValueAtTime(0.001, now);
-      master.gain.linearRampToValueAtTime(0.11, now + 1.8);
+      master.gain.linearRampToValueAtTime(0.10, now + 1.5);
       master.connect(ctx.destination);
       this.masterGain = master;
 
-      // Warm lowpass filter so there are zero harsh highs
+      // Warm lowpass filter for felt-piano softness
       const filter = ctx.createBiquadFilter();
       filter.type = "lowpass";
-      filter.frequency.setValueAtTime(950, now);
-      filter.Q.setValueAtTime(0.7, now);
+      filter.frequency.setValueAtTime(1150, now);
+      filter.Q.setValueAtTime(0.6, now);
       filter.connect(master);
       this.ambientFilter = filter;
 
-      // Gentle breathing LFO modulating the filter cutoff (0.12 Hz = ~8s breath)
-      const lfo = ctx.createOscillator();
-      const lfoGain = ctx.createGain();
-      lfo.type = "sine";
-      lfo.frequency.setValueAtTime(0.12, now);
-      lfoGain.gain.setValueAtTime(280, now);
-      lfo.connect(lfoGain);
-      lfoGain.connect(filter.frequency);
-      lfo.start(now);
-      this.lfoOsc = lfo;
-
-      // Soft delay echo for airy melody plucks
+      // Spacious cosmic delay/reverb tail
       const delay = ctx.createDelay(1.0);
-      delay.delayTime.setValueAtTime(0.42, now);
+      delay.delayTime.setValueAtTime(0.36, now);
       const delayFeedback = ctx.createGain();
-      delayFeedback.gain.setValueAtTime(0.28, now);
+      delayFeedback.gain.setValueAtTime(0.34, now);
       const delayFilter = ctx.createBiquadFilter();
       delayFilter.type = "lowpass";
-      delayFilter.frequency.setValueAtTime(1200, now);
+      delayFilter.frequency.setValueAtTime(950, now);
 
       delay.connect(delayFilter);
       delayFilter.connect(delayFeedback);
       delayFeedback.connect(delay);
       delayFilter.connect(master);
 
-      // Warm 4-chord progression (Fmaj9 -> Em7 -> Dm9 -> Cmaj9)
-      const chords = [
-        [174.61, 220.0, 261.63, 329.63, 392.0], // Fmaj9
-        [164.81, 196.0, 246.94, 293.66, 392.0], // Em7
-        [146.83, 220.0, 261.63, 329.63, 392.0], // Dm9
-        [130.81, 196.0, 246.94, 293.66, 329.63], // Cmaj9
+      // Subtle warm organ bass pad (root + fifth)
+      const bassPads = [
+        { root: 87.31, fifth: 130.81 },  // F2 + C3
+        { root: 98.00, fifth: 146.83 },  // G2 + D3
+        { root: 110.00, fifth: 164.81 }, // A2 + E3
+        { root: 98.00, fifth: 146.83 },  // G2 + D3
       ];
 
       this.ambientOscillators = [];
       this.ambientGains = [];
 
-      chords[0].forEach((freq, idx) => {
+      [bassPads[0].root, bassPads[0].fifth].forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const g = ctx.createGain();
-
         osc.type = "sine";
-        const detune = (idx % 2 === 0 ? 1 : -1) * (idx * 2.2);
         osc.frequency.setValueAtTime(freq, now);
-        osc.detune.setValueAtTime(detune, now);
-
-        const vol = idx === 0 ? 0.24 : 0.14 - idx * 0.015;
-        g.gain.setValueAtTime(Math.max(0.06, vol), now);
+        g.gain.setValueAtTime(idx === 0 ? 0.18 : 0.10, now);
         osc.connect(g);
         g.connect(filter);
         osc.start(now);
-
         this.ambientOscillators.push(osc);
         this.ambientGains.push(g);
       });
 
-      // Smooth chord progression every 6.5 seconds
-      let chordStep = 0;
-      this.chordTimer = setInterval(() => {
-        if (!this.isAmbientPlaying || !this.ctx) return;
+      // Iconic 4-bar arpeggio sequence (6 eighth-notes per bar at ~340ms)
+      const E5 = 659.25;
+      const A4 = 440.00;
+      const B4 = 493.88;
+      const C5 = 523.25;
+      const D5 = 587.33;
+
+      const bars: number[][] = [
+        [A4, E5, A4, E5, A4, E5], // Bar 1: Fmaj7
+        [B4, E5, B4, E5, B4, E5], // Bar 2: G6
+        [C5, E5, C5, E5, C5, E5], // Bar 3: Am
+        [D5, E5, D5, B4, C5, B4], // Bar 4: G/Em turnaround
+      ];
+
+      let barIndex = 0;
+      let stepIndex = 0;
+
+      const playFeltPianoNote = (freq: number, accent: boolean) => {
+        if (!this.isAmbientPlaying || !this.ctx || !this.ambientFilter) return;
         const t = this.ctx.currentTime;
-        chordStep = (chordStep + 1) % chords.length;
-        const nextChord = chords[chordStep];
 
-        this.ambientOscillators.forEach((osc, i) => {
-          if (nextChord[i]) {
-            osc.frequency.setTargetAtTime(nextChord[i], t, 1.8);
-          }
-        });
-      }, 6500);
-
-      // Delicate pentatonic bell/kalimba notes for a musical, relaxing feel
-      const melodyScale = [523.25, 587.33, 659.25, 783.99, 880.0, 987.77]; // C5 D5 E5 G5 A5 B5
-      let melodyIdx = 0;
-
-      const triggerSoftNote = () => {
-        if (!this.isAmbientPlaying || !this.ctx || !this.masterGain) return;
-        const t = this.ctx.currentTime;
-        const freq = melodyScale[melodyIdx % melodyScale.length];
-        melodyIdx = (melodyIdx + 1 + Math.floor(Math.random() * 2)) % melodyScale.length;
-
-        const noteOsc = this.ctx.createOscillator();
+        const osc = this.ctx.createOscillator();
+        const harmonic = this.ctx.createOscillator();
         const noteGain = this.ctx.createGain();
 
-        noteOsc.type = "sine";
-        noteOsc.frequency.setValueAtTime(freq, t);
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, t);
 
+        harmonic.type = "triangle";
+        harmonic.frequency.setValueAtTime(freq, t);
+
+        const harmonicGain = this.ctx.createGain();
+        harmonicGain.gain.setValueAtTime(0.18, t);
+
+        const peak = accent ? 0.24 : 0.16;
         noteGain.gain.setValueAtTime(0.001, t);
-        noteGain.gain.linearRampToValueAtTime(0.16, t + 0.04);
-        noteGain.gain.exponentialRampToValueAtTime(0.0008, t + 2.4);
+        noteGain.gain.linearRampToValueAtTime(peak, t + 0.022);
+        noteGain.gain.exponentialRampToValueAtTime(0.0008, t + 1.45);
 
-        noteOsc.connect(noteGain);
-        noteGain.connect(this.masterGain);
+        osc.connect(noteGain);
+        harmonic.connect(harmonicGain);
+        harmonicGain.connect(noteGain);
+
+        noteGain.connect(this.ambientFilter);
         noteGain.connect(delay);
 
-        noteOsc.start(t);
-        noteOsc.stop(t + 2.5);
+        osc.start(t);
+        harmonic.start(t);
+        osc.stop(t + 1.5);
+        harmonic.stop(t + 1.5);
       };
 
-      // Play first gentle note after 1s, then every 2.8s
-      setTimeout(triggerSoftNote, 1000);
-      this.melodyTimer = setInterval(triggerSoftNote, 2800);
+      const tickArpeggio = () => {
+        if (!this.isAmbientPlaying || !this.ctx) return;
+
+        // Update bass pad smoothly at the start of each bar
+        if (stepIndex === 0) {
+          const t = this.ctx.currentTime;
+          const pad = bassPads[barIndex];
+          if (this.ambientOscillators[0]) {
+            this.ambientOscillators[0].frequency.setTargetAtTime(pad.root, t, 0.35);
+          }
+          if (this.ambientOscillators[1]) {
+            this.ambientOscillators[1].frequency.setTargetAtTime(pad.fifth, t, 0.35);
+          }
+        }
+
+        const noteFreq = bars[barIndex][stepIndex];
+        playFeltPianoNote(noteFreq, stepIndex === 0 || stepIndex === 3);
+
+        stepIndex++;
+        if (stepIndex >= 6) {
+          stepIndex = 0;
+          barIndex = (barIndex + 1) % bars.length;
+        }
+      };
+
+      // Start gently after 350ms, repeating every 340ms
+      setTimeout(tickArpeggio, 350);
+      this.melodyTimer = setInterval(tickArpeggio, 340);
     } catch {
       this.isAmbientPlaying = false;
     }
