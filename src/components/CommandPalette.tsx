@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { profile } from "@/data/portfolioData";
 import { soundManager } from "@/utils/audio";
+import { scrollToSectionById } from "@/utils/scroll";
 
 interface CommandItem {
   id: string;
@@ -39,17 +40,7 @@ export default function CommandPalette({
   const [soundEnabled, setSoundEnabled] = useState(soundManager.isEnabled());
 
   const scrollToSection = (id: string) => {
-    if (id === "inicio") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } else {
-      const el = document.getElementById(id);
-      if (el) {
-        const headerOffset = 65;
-        const elementPosition = el.getBoundingClientRect().top;
-        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-        window.scrollTo({ top: offsetPosition, behavior: "smooth" });
-      }
-    }
+    scrollToSectionById(id);
     onClose();
   };
 

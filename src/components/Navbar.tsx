@@ -13,6 +13,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { soundManager } from "@/utils/audio";
+import { scrollToSectionById } from "@/utils/scroll";
 
 interface NavItemConfig {
   id: string;
@@ -114,25 +115,7 @@ export default function Navbar({
   ) => {
     e.preventDefault();
     soundManager.playClick();
-
-    if (id === "inicio") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-
-    const element = document.getElementById(id);
-    if (element) {
-      // Precise offset calculation to ensure SectionHeading is right at the top
-      // and content is perfectly framed without being pushed down or cut off
-      const headerOffset = 65;
-      const elementPosition = element.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth",
-      });
-    }
+    scrollToSectionById(id);
   };
 
   // Circular gauge math for scroll progress
