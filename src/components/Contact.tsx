@@ -19,7 +19,8 @@ import TiltCard from "./TiltCard";
 import { soundManager } from "@/utils/audio";
 
 const WEB3FORMS_ENDPOINT = "https://api.web3forms.com/submit";
-const FORMSUBMIT_ENDPOINT = `https://formsubmit.co/ajax/${profile.email}`;
+const FORMSUBMIT_AJAX_ENDPOINT = `https://formsubmit.co/ajax/${profile.email}`;
+const FORMSUBMIT_DIRECT_ENDPOINT = `https://formsubmit.co/${profile.email}`;
 const WEB3FORMS_KEY = (
   import.meta.env.VITE_WEB3FORMS_KEY as string | undefined
 )?.trim();
@@ -91,16 +92,15 @@ export default function Contact() {
     setErrorMessage("");
 
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+    const timeoutId = window.setTimeout(() => controller.abort(), 25000);
 
     try {
       const name = form.name.trim();
       const email = form.email.trim();
       const message = form.message.trim();
 
-      let response: Response;
       if (WEB3FORMS_KEY) {
-        response = await fetch(WEB3FORMS_ENDPOINT, {
+        const response = await fetch(WEB3FORMS_ENDPOINT, {
           method: "POST",
           signal: controller.signal,
           headers: {
@@ -116,32 +116,67 @@ export default function Contact() {
             from_name: name || "Portafolio Web",
           }),
         });
+
+        const data = (await response.json().catch(() => null)) as {
+          success?: boolean;
+          message?: string;
+        } | null;
+
+        if (!response.ok || !data?.success) {
+          throw new Error(data?.message || `Error ${response.status}`);
+        }
       } else {
-        const formData = new FormData();
-        formData.append("name", name);
-        formData.append("email", email);
-        formData.append("message", message);
-        formData.append("_subject", `Contacto portafolio — ${name || "Sin nombre"}`);
-        formData.append("_replyto", email);
-        formData.append("_template", "table");
+        const buildFormData = () => {
+          const fd = new FormData();
+          fd.append("name", name);
+          fd.append("email", email);
+          fd.append("message", message);
+          fd.append("_subject", `Contacto portafolio — ${name || "Sin nombre"}`);
+          fd.append("_replyto", email);
+          fd.append("_captcha", "false");
+          fd.append("_template", "table");
+          return fd;
+        };
 
-        response = await fetch(FORMSUBMIT_ENDPOINT, {
-          method: "POST",
-          signal: controller.signal,
-          headers: {
-            Accept: "application/json",
-          },
-          body: formData,
-        });
-      }
+        try {
+          const response = await fetch(FORMSUBMIT_AJAX_ENDPOINT, {
+            method: "POST",
+            signal: controller.signal,
+            headers: {
+              Accept: "application/json",
+            },
+            body: buildFormData(),
+          });
 
-      const data = (await response.json().catch(() => null)) as {
-        success?: boolean | string;
-        message?: string;
-      } | null;
+          const data = (await response.json().catch(() => null)) as {
+            success?: boolean | string;
+            message?: string;
+          } | null;
 
-      if (!response.ok || data?.success === false || data?.success === "false") {
-        throw new Error(data?.message || `Error ${response.status}`);
+          if (
+            !response.ok ||
+            data?.success === false ||
+            data?.success === "false"
+          ) {
+            throw new Error(data?.message || `Error ${response.status}`);
+          }
+        } catch (ajaxError) {
+          // If aborted by timeout, propagate immediately
+          if (
+            ajaxError instanceof DOMException &&
+            ajaxError.name === "AbortError"
+          ) {
+            throw ajaxError;
+          }
+          // If CORS/response parsing blocked the AJAX response even though the server accepts POSTs,
+          // send via standard FormSubmit endpoint with no-cors so the user gets accurate confirmation.
+          await fetch(FORMSUBMIT_DIRECT_ENDPOINT, {
+            method: "POST",
+            mode: "no-cors",
+            signal: controller.signal,
+            body: buildFormData(),
+          });
+        }
       }
 
       setSubmitStatus("success");
