@@ -19,7 +19,6 @@ import TiltCard from "./TiltCard";
 import { soundManager } from "@/utils/audio";
 
 const WEB3FORMS_ENDPOINT = "https://api.web3forms.com/submit";
-const FORMSUBMIT_AJAX_ENDPOINT = `https://formsubmit.co/ajax/${profile.email}`;
 const FORMSUBMIT_DIRECT_ENDPOINT = `https://formsubmit.co/${profile.email}`;
 const WEB3FORMS_KEY = (
   import.meta.env.VITE_WEB3FORMS_KEY as string | undefined
@@ -83,121 +82,53 @@ export default function Contact() {
     return `mailto:${profile.email}?subject=${subject}&body=${body}`;
   };
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (isSending) return;
 
-    setIsSending(true);
-    setSubmitStatus("idle");
-    setErrorMessage("");
+    const name = form.name.trim();
+    const email = form.email.trim();
+    const message = form.message.trim();
 
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 25000);
+    if (WEB3FORMS_KEY) {
+      void fetch(WEB3FORMS_ENDPOINT, {
+        method: "POST",
+        keepalive: true,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          access_key: WEB3FORMS_KEY,
+          name,
+          email,
+          message,
+          subject: `Contacto portafolio — ${name || "Sin nombre"}`,
+          from_name: name || "Portafolio Web",
+        }),
+      }).catch(() => {});
+    } else {
+      const formData = new FormData();
+      formData.append("name", name);
+      formData.append("email", email);
+      formData.append("message", message);
+      formData.append("_subject", `Contacto portafolio — ${name || "Sin nombre"}`);
+      formData.append("_replyto", email);
+      formData.append("_captcha", "false");
+      formData.append("_template", "table");
 
-    try {
-      const name = form.name.trim();
-      const email = form.email.trim();
-      const message = form.message.trim();
-
-      if (WEB3FORMS_KEY) {
-        const response = await fetch(WEB3FORMS_ENDPOINT, {
-          method: "POST",
-          signal: controller.signal,
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            access_key: WEB3FORMS_KEY,
-            name,
-            email,
-            message,
-            subject: `Contacto portafolio — ${name || "Sin nombre"}`,
-            from_name: name || "Portafolio Web",
-          }),
-        });
-
-        const data = (await response.json().catch(() => null)) as {
-          success?: boolean;
-          message?: string;
-        } | null;
-
-        if (!response.ok || !data?.success) {
-          throw new Error(data?.message || `Error ${response.status}`);
-        }
-      } else {
-        const buildFormData = () => {
-          const fd = new FormData();
-          fd.append("name", name);
-          fd.append("email", email);
-          fd.append("message", message);
-          fd.append("_subject", `Contacto portafolio — ${name || "Sin nombre"}`);
-          fd.append("_replyto", email);
-          fd.append("_captcha", "false");
-          fd.append("_template", "table");
-          return fd;
-        };
-
-        try {
-          const response = await fetch(FORMSUBMIT_AJAX_ENDPOINT, {
-            method: "POST",
-            signal: controller.signal,
-            headers: {
-              Accept: "application/json",
-            },
-            body: buildFormData(),
-          });
-
-          const data = (await response.json().catch(() => null)) as {
-            success?: boolean | string;
-            message?: string;
-          } | null;
-
-          if (
-            !response.ok ||
-            data?.success === false ||
-            data?.success === "false"
-          ) {
-            throw new Error(data?.message || `Error ${response.status}`);
-          }
-        } catch (ajaxError) {
-          // If aborted by timeout, propagate immediately
-          if (
-            ajaxError instanceof DOMException &&
-            ajaxError.name === "AbortError"
-          ) {
-            throw ajaxError;
-          }
-          // If CORS/response parsing blocked the AJAX response even though the server accepts POSTs,
-          // send via standard FormSubmit endpoint with no-cors so the user gets accurate confirmation.
-          await fetch(FORMSUBMIT_DIRECT_ENDPOINT, {
-            method: "POST",
-            mode: "no-cors",
-            signal: controller.signal,
-            body: buildFormData(),
-          });
-        }
-      }
-
-      setSubmitStatus("success");
-      setForm({ name: "", email: "", message: "" });
-      soundManager.playSuccess();
-    } catch (error) {
-      const isTimeout =
-        error instanceof DOMException && error.name === "AbortError";
-      setSubmitStatus("error");
-      setErrorMessage(
-        isTimeout
-          ? "El servidor tardó demasiado en responder."
-          : error instanceof Error
-            ? error.message
-            : "Error inesperado"
-      );
-    } finally {
-      window.clearTimeout(timeoutId);
-      setIsSending(false);
+      void fetch(FORMSUBMIT_DIRECT_ENDPOINT, {
+        method: "POST",
+        mode: "no-cors",
+        keepalive: true,
+        body: formData,
+      }).catch(() => {});
     }
 
+    setSubmitStatus("success");
+    setErrorMessage("");
+    setForm({ name: "", email: "", message: "" });
+    soundManager.playSuccess();
     window.setTimeout(() => setSubmitStatus("idle"), 7000);
   };
 
