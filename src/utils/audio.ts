@@ -95,11 +95,20 @@ class SoundManager {
       this.isAmbientPlaying = true;
       const now = ctx.currentTime;
 
+      // Soft limiter/compressor to prevent any clipping when notes overlap
+      const compressor = ctx.createDynamicsCompressor();
+      compressor.threshold.setValueAtTime(-14, now);
+      compressor.knee.setValueAtTime(18, now);
+      compressor.ratio.setValueAtTime(4, now);
+      compressor.attack.setValueAtTime(0.01, now);
+      compressor.release.setValueAtTime(0.25, now);
+      compressor.connect(ctx.destination);
+
       // Master ambient volume (rich, clearly audible)
       const master = ctx.createGain();
       master.gain.setValueAtTime(0.001, now);
-      master.gain.linearRampToValueAtTime(0.34, now + 1.4);
-      master.connect(ctx.destination);
+      master.gain.linearRampToValueAtTime(0.32, now + 1.2);
+      master.connect(compressor);
       this.masterGain = master;
 
       // Warm lowpass filter for rich organ/piano warmth
@@ -149,34 +158,38 @@ class SoundManager {
         this.ambientGains.push(g);
       });
 
-      // Long, sustained Interstellar main melody (legato whole/half notes, no split plucks)
+      // Interstellar main melody: starts slow and settles into natural tempo
       const E5 = 659.25;
       const A4 = 440.00;
       const B4 = 493.88;
       const C5 = 523.25;
       const D5 = 587.33;
 
-      const phraseEvents: { freq: number; durationMs: number; chordIdx?: number }[] = [
-        { freq: A4, durationMs: 1700, chordIdx: 0 }, // Fmaj7: A4 (long)
-        { freq: E5, durationMs: 2300 },              //        E5 (long)
-        { freq: B4, durationMs: 1700, chordIdx: 1 }, // G6:    B4 (long)
-        { freq: E5, durationMs: 2300 },              //        E5 (long)
-        { freq: C5, durationMs: 1700, chordIdx: 2 }, // Am:    C5 (long)
-        { freq: E5, durationMs: 2300 },              //        E5 (long)
-        { freq: D5, durationMs: 1600, chordIdx: 3 }, // G:     D5 (long)
-        { freq: C5, durationMs: 1100 },              //        C5 (sustained)
-        { freq: B4, durationMs: 1600 },              //        B4 (long)
+      const phraseEvents: { freq: number; baseMs: number; chordIdx?: number }[] = [
+        { freq: A4, baseMs: 680, chordIdx: 0 }, // Fmaj7: A4
+        { freq: E5, baseMs: 920 },              //        E5
+        { freq: B4, baseMs: 680, chordIdx: 1 }, // G6:    B4
+        { freq: E5, baseMs: 920 },              //        E5
+        { freq: C5, baseMs: 680, chordIdx: 2 }, // Am:    C5
+        { freq: E5, baseMs: 920 },              //        E5
+        { freq: D5, baseMs: 680, chordIdx: 3 }, // G:     D5
+        { freq: C5, baseMs: 460 },              //        C5
+        { freq: B4, baseMs: 680 },              //        B4
       ];
 
       let eventIndex = 0;
+      let tempoScale = 1.55; // Start slow, then settle smoothly to 1.0 (normal speed)
 
       const playLongMelodyNote = (freq: number, durationMs: number) => {
         if (!this.isAmbientPlaying || !this.ctx || !this.ambientFilter) return;
         const t = this.ctx.currentTime;
         const durSec = durationMs / 1000;
+        const releaseSec = 0.95;
+        const totalSec = durSec + releaseSec;
 
         const osc = this.ctx.createOscillator();
         const harmonic = this.ctx.createOscillator();
+        const harmonicGain = this.ctx.createGain();
         const noteGain = this.ctx.createGain();
 
         osc.type = "sine";
@@ -184,15 +197,13 @@ class SoundManager {
 
         harmonic.type = "triangle";
         harmonic.frequency.setValueAtTime(freq, t);
+        harmonicGain.gain.setValueAtTime(0.18, t);
 
-        const harmonicGain = this.ctx.createGain();
-        harmonicGain.gain.setValueAtTime(0.20, t);
-
-        // Smooth legato envelope: gentle swell in, long sustain, soft overlap tail
-        noteGain.gain.setValueAtTime(0.001, t);
-        noteGain.gain.linearRampToValueAtTime(0.32, t + 0.14);
-        noteGain.gain.setValueAtTime(0.28, t + durSec * 0.72);
-        noteGain.gain.exponentialRampToValueAtTime(0.0008, t + durSec + 0.75);
+        // Continuous click-free legato envelope (no abrupt setValueAtTime jumps)
+        noteGain.gain.setValueAtTime(0.0001, t);
+        noteGain.gain.linearRampToValueAtTime(0.30, t + 0.09);
+        noteGain.gain.linearRampToValueAtTime(0.24, t + durSec * 0.78);
+        noteGain.gain.exponentialRampToValueAtTime(0.0001, t + totalSec);
 
         osc.connect(noteGain);
         harmonic.connect(harmonicGain);
@@ -203,35 +214,42 @@ class SoundManager {
 
         osc.start(t);
         harmonic.start(t);
-        osc.stop(t + durSec + 0.8);
-        harmonic.stop(t + durSec + 0.8);
+        osc.stop(t + totalSec + 0.05);
+        harmonic.stop(t + totalSec + 0.05);
       };
 
       const scheduleNextNote = () => {
         if (!this.isAmbientPlaying || !this.ctx) return;
 
         const ev = phraseEvents[eventIndex];
+        const durationMs = Math.round(ev.baseMs * tempoScale);
+
         if (ev.chordIdx !== undefined) {
           const t = this.ctx.currentTime;
           const pad = bassPads[ev.chordIdx];
           if (this.ambientOscillators[0]) {
-            this.ambientOscillators[0].frequency.setTargetAtTime(pad.root, t, 0.45);
+            this.ambientOscillators[0].frequency.setTargetAtTime(pad.root, t, 0.35);
           }
           if (this.ambientOscillators[1]) {
-            this.ambientOscillators[1].frequency.setTargetAtTime(pad.fifth, t, 0.45);
+            this.ambientOscillators[1].frequency.setTargetAtTime(pad.fifth, t, 0.35);
           }
           if (this.ambientOscillators[2]) {
-            this.ambientOscillators[2].frequency.setTargetAtTime(pad.third, t, 0.45);
+            this.ambientOscillators[2].frequency.setTargetAtTime(pad.third, t, 0.35);
           }
         }
 
-        playLongMelodyNote(ev.freq, ev.durationMs);
-        eventIndex = (eventIndex + 1) % phraseEvents.length;
+        playLongMelodyNote(ev.freq, durationMs);
 
-        this.melodyTimer = setTimeout(scheduleNextNote, ev.durationMs) as unknown as ReturnType<typeof setInterval>;
+        // Smoothly accelerate from slow intro (1.55x) to normal speed (1.0x)
+        if (tempoScale > 1.0) {
+          tempoScale = Math.max(1.0, tempoScale - 0.065);
+        }
+
+        eventIndex = (eventIndex + 1) % phraseEvents.length;
+        this.melodyTimer = setTimeout(scheduleNextNote, durationMs) as unknown as ReturnType<typeof setInterval>;
       };
 
-      this.melodyTimer = setTimeout(scheduleNextNote, 250) as unknown as ReturnType<typeof setInterval>;
+      this.melodyTimer = setTimeout(scheduleNextNote, 200) as unknown as ReturnType<typeof setInterval>;
     } catch {
       this.isAmbientPlaying = false;
     }
