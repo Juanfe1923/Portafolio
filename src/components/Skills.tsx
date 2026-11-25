@@ -159,7 +159,7 @@ export default function Skills() {
     >
       <SectionHeading
         eyebrow="// stack & arquitectura 3d"
-        title="Matriz de Especialización"
+        title="Habilidades y Conocimientos"
         subtitle="Ecosistema tecnológico integral: interfaces modernas, servicios backend resilientes y persistencia optimizada."
       />
 
