@@ -95,52 +95,53 @@ class SoundManager {
       this.isAmbientPlaying = true;
       const now = ctx.currentTime;
 
-      // Master ambient volume (clearly audible, warm & balanced)
+      // Master ambient volume (rich, clearly audible)
       const master = ctx.createGain();
       master.gain.setValueAtTime(0.001, now);
-      master.gain.linearRampToValueAtTime(0.22, now + 1.4);
+      master.gain.linearRampToValueAtTime(0.34, now + 1.4);
       master.connect(ctx.destination);
       this.masterGain = master;
 
-      // Warm lowpass filter for felt-piano softness
+      // Warm lowpass filter for rich organ/piano warmth
       const filter = ctx.createBiquadFilter();
       filter.type = "lowpass";
-      filter.frequency.setValueAtTime(1150, now);
+      filter.frequency.setValueAtTime(1400, now);
       filter.Q.setValueAtTime(0.6, now);
       filter.connect(master);
       this.ambientFilter = filter;
 
       // Spacious cosmic delay/reverb tail
       const delay = ctx.createDelay(1.0);
-      delay.delayTime.setValueAtTime(0.36, now);
+      delay.delayTime.setValueAtTime(0.45, now);
       const delayFeedback = ctx.createGain();
-      delayFeedback.gain.setValueAtTime(0.34, now);
+      delayFeedback.gain.setValueAtTime(0.32, now);
       const delayFilter = ctx.createBiquadFilter();
       delayFilter.type = "lowpass";
-      delayFilter.frequency.setValueAtTime(950, now);
+      delayFilter.frequency.setValueAtTime(1050, now);
 
       delay.connect(delayFilter);
       delayFilter.connect(delayFeedback);
       delayFeedback.connect(delay);
       delayFilter.connect(master);
 
-      // Subtle warm organ bass pad (root + fifth) following Fmaj7 -> G6 -> Am -> G
+      // Warm sustained organ pad (root + fifth + third) following Fmaj7 -> G6 -> Am -> G
       const bassPads = [
-        { root: 87.31, fifth: 130.81, lead: 880.00 },   // F2 + C3 (lead A5)
-        { root: 98.00, fifth: 146.83, lead: 987.77 },   // G2 + D3 (lead B5)
-        { root: 110.00, fifth: 164.81, lead: 1046.50 }, // A2 + E3 (lead C6)
-        { root: 98.00, fifth: 146.83, lead: 987.77 },   // G2 + D3 (lead B5)
+        { root: 87.31, fifth: 130.81, third: 220.00 },  // F2 + C3 + A3
+        { root: 98.00, fifth: 146.83, third: 246.94 },  // G2 + D3 + B3
+        { root: 110.00, fifth: 164.81, third: 261.63 }, // A2 + E3 + C4
+        { root: 98.00, fifth: 146.83, third: 246.94 },  // G2 + D3 + B3
       ];
 
       this.ambientOscillators = [];
       this.ambientGains = [];
 
-      [bassPads[0].root, bassPads[0].fifth].forEach((freq, idx) => {
+      [bassPads[0].root, bassPads[0].fifth, bassPads[0].third].forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const g = ctx.createGain();
-        osc.type = "sine";
+        osc.type = idx === 2 ? "triangle" : "sine";
         osc.frequency.setValueAtTime(freq, now);
-        g.gain.setValueAtTime(idx === 0 ? 0.24 : 0.15, now);
+        const vols = [0.26, 0.16, 0.08];
+        g.gain.setValueAtTime(vols[idx] ?? 0.12, now);
         osc.connect(g);
         g.connect(filter);
         osc.start(now);
@@ -148,27 +149,31 @@ class SoundManager {
         this.ambientGains.push(g);
       });
 
-      // Exact Interstellar (Day One / Cornfield Chase) 8-bar arpeggio in A minor
-      // 12 eighth-notes (2 bars of 3/4) per chord at ~300ms per note
+      // Long, sustained Interstellar main melody (legato whole/half notes, no split plucks)
       const E5 = 659.25;
       const A4 = 440.00;
       const B4 = 493.88;
       const C5 = 523.25;
       const D5 = 587.33;
 
-      const sections: number[][] = [
-        [A4, E5, A4, E5, A4, E5, A4, E5, A4, E5, A4, E5], // Fmaj7 (2 bars)
-        [B4, E5, B4, E5, B4, E5, B4, E5, B4, E5, B4, E5], // G6    (2 bars)
-        [C5, E5, C5, E5, C5, E5, C5, E5, C5, E5, C5, E5], // Am    (2 bars)
-        [D5, E5, D5, E5, D5, E5, D5, E5, D5, E5, C5, B4], // G     (2 bars + turnaround)
+      const phraseEvents: { freq: number; durationMs: number; chordIdx?: number }[] = [
+        { freq: A4, durationMs: 1700, chordIdx: 0 }, // Fmaj7: A4 (long)
+        { freq: E5, durationMs: 2300 },              //        E5 (long)
+        { freq: B4, durationMs: 1700, chordIdx: 1 }, // G6:    B4 (long)
+        { freq: E5, durationMs: 2300 },              //        E5 (long)
+        { freq: C5, durationMs: 1700, chordIdx: 2 }, // Am:    C5 (long)
+        { freq: E5, durationMs: 2300 },              //        E5 (long)
+        { freq: D5, durationMs: 1600, chordIdx: 3 }, // G:     D5 (long)
+        { freq: C5, durationMs: 1100 },              //        C5 (sustained)
+        { freq: B4, durationMs: 1600 },              //        B4 (long)
       ];
 
-      let sectionIndex = 0;
-      let stepIndex = 0;
+      let eventIndex = 0;
 
-      const playFeltPianoNote = (freq: number, accent: boolean) => {
+      const playLongMelodyNote = (freq: number, durationMs: number) => {
         if (!this.isAmbientPlaying || !this.ctx || !this.ambientFilter) return;
         const t = this.ctx.currentTime;
+        const durSec = durationMs / 1000;
 
         const osc = this.ctx.createOscillator();
         const harmonic = this.ctx.createOscillator();
@@ -181,12 +186,13 @@ class SoundManager {
         harmonic.frequency.setValueAtTime(freq, t);
 
         const harmonicGain = this.ctx.createGain();
-        harmonicGain.gain.setValueAtTime(0.18, t);
+        harmonicGain.gain.setValueAtTime(0.20, t);
 
-        const peak = accent ? 0.34 : 0.24;
+        // Smooth legato envelope: gentle swell in, long sustain, soft overlap tail
         noteGain.gain.setValueAtTime(0.001, t);
-        noteGain.gain.linearRampToValueAtTime(peak, t + 0.02);
-        noteGain.gain.exponentialRampToValueAtTime(0.0008, t + 1.5);
+        noteGain.gain.linearRampToValueAtTime(0.32, t + 0.14);
+        noteGain.gain.setValueAtTime(0.28, t + durSec * 0.72);
+        noteGain.gain.exponentialRampToValueAtTime(0.0008, t + durSec + 0.75);
 
         osc.connect(noteGain);
         harmonic.connect(harmonicGain);
@@ -197,63 +203,35 @@ class SoundManager {
 
         osc.start(t);
         harmonic.start(t);
-        osc.stop(t + 1.55);
-        harmonic.stop(t + 1.55);
+        osc.stop(t + durSec + 0.8);
+        harmonic.stop(t + durSec + 0.8);
       };
 
-      const playOrganSwell = (freq: number) => {
-        if (!this.isAmbientPlaying || !this.ctx || !this.ambientFilter) return;
-        const t = this.ctx.currentTime;
-
-        const osc = this.ctx.createOscillator();
-        const swellGain = this.ctx.createGain();
-
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(freq, t);
-
-        swellGain.gain.setValueAtTime(0.001, t);
-        swellGain.gain.linearRampToValueAtTime(0.10, t + 0.9);
-        swellGain.gain.exponentialRampToValueAtTime(0.0008, t + 3.2);
-
-        osc.connect(swellGain);
-        swellGain.connect(this.ambientFilter);
-        swellGain.connect(delay);
-
-        osc.start(t);
-        osc.stop(t + 3.3);
-      };
-
-      const tickArpeggio = () => {
+      const scheduleNextNote = () => {
         if (!this.isAmbientPlaying || !this.ctx) return;
 
-        // Update bass pad at the start of each 2-bar chord
-        if (stepIndex === 0) {
+        const ev = phraseEvents[eventIndex];
+        if (ev.chordIdx !== undefined) {
           const t = this.ctx.currentTime;
-          const pad = bassPads[sectionIndex];
+          const pad = bassPads[ev.chordIdx];
           if (this.ambientOscillators[0]) {
-            this.ambientOscillators[0].frequency.setTargetAtTime(pad.root, t, 0.35);
+            this.ambientOscillators[0].frequency.setTargetAtTime(pad.root, t, 0.45);
           }
           if (this.ambientOscillators[1]) {
-            this.ambientOscillators[1].frequency.setTargetAtTime(pad.fifth, t, 0.35);
+            this.ambientOscillators[1].frequency.setTargetAtTime(pad.fifth, t, 0.45);
           }
-          // Soaring high organ note on bar 2 of each chord
-        } else if (stepIndex === 6) {
-          playOrganSwell(bassPads[sectionIndex].lead);
+          if (this.ambientOscillators[2]) {
+            this.ambientOscillators[2].frequency.setTargetAtTime(pad.third, t, 0.45);
+          }
         }
 
-        const noteFreq = sections[sectionIndex][stepIndex];
-        playFeltPianoNote(noteFreq, stepIndex % 6 === 0 || stepIndex % 6 === 3);
+        playLongMelodyNote(ev.freq, ev.durationMs);
+        eventIndex = (eventIndex + 1) % phraseEvents.length;
 
-        stepIndex++;
-        if (stepIndex >= 12) {
-          stepIndex = 0;
-          sectionIndex = (sectionIndex + 1) % sections.length;
-        }
+        this.melodyTimer = setTimeout(scheduleNextNote, ev.durationMs) as unknown as ReturnType<typeof setInterval>;
       };
 
-      // Start at ~100 BPM eighth-note pace (300ms)
-      setTimeout(tickArpeggio, 300);
-      this.melodyTimer = setInterval(tickArpeggio, 300);
+      this.melodyTimer = setTimeout(scheduleNextNote, 250) as unknown as ReturnType<typeof setInterval>;
     } catch {
       this.isAmbientPlaying = false;
     }
@@ -268,6 +246,7 @@ class SoundManager {
         this.chordTimer = null;
       }
       if (this.melodyTimer) {
+        clearTimeout(this.melodyTimer);
         clearInterval(this.melodyTimer);
         this.melodyTimer = null;
       }
