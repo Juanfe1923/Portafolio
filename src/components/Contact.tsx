@@ -28,7 +28,6 @@ type SubmitStatus = "idle" | "success" | "error";
 
 export default function Contact() {
   const [copied, setCopied] = useState(false);
-  const [isSending, setIsSending] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [form, setForm] = useState({ name: "", email: "", message: "" });
@@ -84,7 +83,6 @@ export default function Contact() {
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (isSending) return;
 
     const name = form.name.trim();
     const email = form.email.trim();
@@ -258,7 +256,6 @@ export default function Contact() {
         <TiltCard maxTilt={5} glareColor="rgba(168, 85, 247, 0.12)">
           <motion.form
             onSubmit={handleSubmit}
-            aria-busy={isSending}
             initial={{ opacity: 0, y: 28 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-60px" }}
@@ -342,11 +339,10 @@ export default function Contact() {
             <div className="mt-6">
               <button
                 type="submit"
-                disabled={isSending}
                 onClick={() => soundManager.playClick()}
-                className="group relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-500 via-sky-400 to-violet-500 px-6 py-3.5 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/25 transition-all duration-300 hover:shadow-cyan-400/40 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                className="group relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-500 via-sky-400 to-violet-500 px-6 py-3.5 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/25 transition-all duration-300 hover:shadow-cyan-400/40 hover:brightness-110 sm:w-auto"
               >
-                <span>{isSending ? "Enviando…" : "Enviar Mensaje"}</span>
+                <span>Enviar Mensaje</span>
                 <Send
                   size={15}
                   className="transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-0.5"

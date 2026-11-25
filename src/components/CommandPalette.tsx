@@ -39,13 +39,13 @@ export default function CommandPalette({
   const [copied, setCopied] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(soundManager.isEnabled());
 
-  const scrollToSection = (id: string) => {
-    scrollToSectionById(id);
-    onClose();
-  };
+  const items: CommandItem[] = useMemo(() => {
+    const scrollToSection = (id: string) => {
+      scrollToSectionById(id);
+      onClose();
+    };
 
-  const items: CommandItem[] = useMemo(
-    () => [
+    return [
       {
         id: "nav-inicio",
         title: "Ir al Inicio",
@@ -144,9 +144,8 @@ export default function CommandPalette({
           soundManager.playWarp();
         },
       },
-    ],
-    [onClose, soundEnabled]
-  );
+    ];
+  }, [onClose, soundEnabled]);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return items;
