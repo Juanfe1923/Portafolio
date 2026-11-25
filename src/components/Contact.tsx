@@ -18,7 +18,11 @@ import SectionHeading from "./SectionHeading";
 import TiltCard from "./TiltCard";
 import { soundManager } from "@/utils/audio";
 
-const FORM_ENDPOINT = `https://formsubmit.co/ajax/${profile.email}`;
+const WEB3FORMS_ENDPOINT = "https://api.web3forms.com/submit";
+const FORMSUBMIT_ENDPOINT = `https://formsubmit.co/ajax/${profile.email}`;
+const WEB3FORMS_KEY = (
+  import.meta.env.VITE_WEB3FORMS_KEY as string | undefined
+)?.trim();
 
 type SubmitStatus = "idle" | "success" | "error";
 
@@ -86,29 +90,57 @@ export default function Contact() {
     setSubmitStatus("idle");
     setErrorMessage("");
 
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+
     try {
-      const response = await fetch(FORM_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          email: form.email.trim(),
-          message: form.message.trim(),
-          _subject: `Contacto portafolio — ${form.name.trim() || "Sin nombre"}`,
-          _replyto: form.email.trim(),
-          _template: "table",
-        }),
-      });
+      const name = form.name.trim();
+      const email = form.email.trim();
+      const message = form.message.trim();
+
+      let response: Response;
+      if (WEB3FORMS_KEY) {
+        response = await fetch(WEB3FORMS_ENDPOINT, {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            access_key: WEB3FORMS_KEY,
+            name,
+            email,
+            message,
+            subject: `Contacto portafolio — ${name || "Sin nombre"}`,
+            from_name: name || "Portafolio Web",
+          }),
+        });
+      } else {
+        const formData = new FormData();
+        formData.append("name", name);
+        formData.append("email", email);
+        formData.append("message", message);
+        formData.append("_subject", `Contacto portafolio — ${name || "Sin nombre"}`);
+        formData.append("_replyto", email);
+        formData.append("_template", "table");
+
+        response = await fetch(FORMSUBMIT_ENDPOINT, {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            Accept: "application/json",
+          },
+          body: formData,
+        });
+      }
 
       const data = (await response.json().catch(() => null)) as {
-        success?: boolean;
+        success?: boolean | string;
         message?: string;
       } | null;
 
-      if (!response.ok || data?.success === false) {
+      if (!response.ok || data?.success === false || data?.success === "false") {
         throw new Error(data?.message || `Error ${response.status}`);
       }
 
@@ -116,11 +148,18 @@ export default function Contact() {
       setForm({ name: "", email: "", message: "" });
       soundManager.playSuccess();
     } catch (error) {
+      const isTimeout =
+        error instanceof DOMException && error.name === "AbortError";
       setSubmitStatus("error");
       setErrorMessage(
-        error instanceof Error ? error.message : "Error inesperado"
+        isTimeout
+          ? "El servidor tardó demasiado en responder."
+          : error instanceof Error
+            ? error.message
+            : "Error inesperado"
       );
     } finally {
+      window.clearTimeout(timeoutId);
       setIsSending(false);
     }
 
