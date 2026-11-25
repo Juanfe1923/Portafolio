@@ -95,12 +95,12 @@ class SoundManager {
       this.isAmbientPlaying = true;
       const now = ctx.currentTime;
 
-      // Soft limiter/compressor to prevent any clipping when notes overlap
+      // Gentle safety limiter (only catches true peaks above -3 dB, never ducks notes)
       const compressor = ctx.createDynamicsCompressor();
-      compressor.threshold.setValueAtTime(-14, now);
-      compressor.knee.setValueAtTime(18, now);
-      compressor.ratio.setValueAtTime(4, now);
-      compressor.attack.setValueAtTime(0.01, now);
+      compressor.threshold.setValueAtTime(-3, now);
+      compressor.knee.setValueAtTime(12, now);
+      compressor.ratio.setValueAtTime(2, now);
+      compressor.attack.setValueAtTime(0.02, now);
       compressor.release.setValueAtTime(0.25, now);
       compressor.connect(ctx.destination);
 
@@ -147,10 +147,10 @@ class SoundManager {
       [bassPads[0].root, bassPads[0].fifth, bassPads[0].third].forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const g = ctx.createGain();
-        osc.type = idx === 2 ? "triangle" : "sine";
+        osc.type = "sine";
         osc.frequency.setValueAtTime(freq, now);
-        const vols = [0.26, 0.16, 0.08];
-        g.gain.setValueAtTime(vols[idx] ?? 0.12, now);
+        const vols = [0.22, 0.14, 0.08];
+        g.gain.setValueAtTime(vols[idx] ?? 0.10, now);
         osc.connect(g);
         g.connect(filter);
         osc.start(now);
@@ -192,7 +192,7 @@ class SoundManager {
       ) => {
         if (!this.isAmbientPlaying || !this.ctx || !this.ambientFilter) return;
         const attackSec = 0.08;
-        const releaseSec = 0.55;
+        const releaseSec = 0.38;
         const endTime = startTime + durSec + releaseSec;
 
         const osc = this.ctx.createOscillator();
